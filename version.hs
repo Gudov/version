@@ -4,18 +4,23 @@ import Text.Printf
 import System.IO
 import Data.Time.Clock
 import Data.Time.Calendar
+import System.Directory
 
-readBuildNumber :: FilePath -> IO Int
-readBuildNumber fileName = do
-  readResult <- Control.Exception.try (evaluate $ readFile' fileName) :: IO (Either SomeException (IO String))
-  case readResult of
-    Left ex -> return 0
-    Right val -> do
-      str <- val
-      return $ extractBuildNumber $ words $ head $ lines str
+maybeReadFile :: String -> IO (Maybe String)
+maybeReadFile fileName = do
+  fileExist <- doesFileExist fileName
+  case fileExist of
+    True -> do 
+      content <- readFile' fileName
+      return $ Just $ content
+    False -> return Nothing
+
+parseVersion str = 
+    extractBuildNumber $ words $ head $ lines str
   where
     extractBuildNumber [_, _, number] = read number :: Int
     extractBuildNumber _ = 0 :: Int
+
 
 formatBuildString :: Int -> String -> String
 formatBuildString buildNumber buildDate = printf (
@@ -27,6 +32,9 @@ formatBuildString buildNumber buildDate = printf (
 main = do
   args <- getArgs
   let fileName = head args
-  buildNumber <- readBuildNumber fileName
+  fileContent <- maybeReadFile fileName
+  let buildNumber = case fileContent of
+                      Just content -> parseVersion content
+                      Nothing -> 0
   buildDate <- getCurrentTime >>= return . show
   writeFile fileName $ formatBuildString (buildNumber + 1) buildDate
